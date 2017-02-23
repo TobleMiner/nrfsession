@@ -65,6 +65,12 @@ typedef struct packet_counter {
 	uint16_t tx;
 } packet_counter;
 
+typedef struct tx_data {
+	unsigned char* data;
+	unsigned char* pos;
+	unsigned char* end;
+} tx_data;
+
 typedef struct session {
 	struct session_handler* handler;
 	struct sessionid id;
@@ -72,6 +78,7 @@ typedef struct session {
 	struct aes_ctx aes;
 	struct psk key;
 	struct packet_counter cnt;
+	struct tx_data tx_data;
 	unsigned char challenge_tx[CHALLENGE_LENGTH];
 	unsigned char challenge_rx[CHALLENGE_LENGTH];
 	unsigned char* iv_dec;
