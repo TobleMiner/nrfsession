@@ -4,7 +4,9 @@
 #include <malloc.h>
 #include <string.h>
 
-void send_packet(void* ctx, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen)
+#include "../session/session.h"
+
+void send_packet(void* ctx, struct session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen)
 {
 	printf("TX => ");
 	for(int i = 0; i < addrlen; i++)

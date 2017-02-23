@@ -11,7 +11,7 @@
 #define SESSION_MIN_PACKET_LEN	28
 #define SESSION_PACKET_INIT_LEN	31
 #define SESSION_PACKET_AUTH_LEN	28
-#define SESSION_PACKET_DATA_LEN	28
+#define SESSION_PACKET_DATA_LEN	24
 
 #define SESSION_PACKET_CHALLENGE_OFFSET		4
 #define SESSION_PACKET_ADDRESS_OFFSET		8
@@ -19,7 +19,7 @@
 #define SESSION_PACKET_AUTH_IV_OFFSET		8
 #define SESSION_PACKET_INIT_KEYID_OFFSET	29
 #define SESSION_PACKET_NEW_HMAC_OFFSET		24
-#define SESSION_PACKET_AUTH_HMAC_OFFSET		25
+#define SESSION_PACKET_AUTH_HMAC_OFFSET		21
 
 #define ADDRESS_LENGTH 5
 
@@ -60,13 +60,20 @@ typedef struct psk {
 	unsigned char key[KEY_LENGTH];
 } psk;
 
+typedef struct packet_counter {
+	uint16_t rx;
+	uint16_t tx;
+} packet_counter;
+
 typedef struct session {
 	struct session_handler* handler;
 	struct sessionid id;
 	struct nrfaddress peeraddress;
 	struct aes_ctx aes;
 	struct psk key;
-	unsigned char challenge[CHALLENGE_LENGTH];
+	struct packet_counter cnt;
+	unsigned char challenge_tx[CHALLENGE_LENGTH];
+	unsigned char challenge_rx[CHALLENGE_LENGTH];
 	unsigned char* iv_dec;
 	unsigned char* iv_enc;
 	uint32_t timeout;
@@ -82,7 +89,8 @@ typedef struct session_handler {
 	uint16_t packetcnt;
 	struct llist_head* sessions;
 	void* ctx;
-	void (*send_packet)(void* ctx, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen);
+	void (*send_packet)(void* ctx, session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen);
+	void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen); 
 } session_handler;
 
 #define HEADER_LENGTH sizeof(struct sessionid)
