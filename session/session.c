@@ -131,11 +131,6 @@ void free_session_handler(struct session_handler* handler)
 	free(handler);
 }
 
-enum role {
-	ROLE_RX,
-	ROLE_TX
-};
-
 int session_init_challenge_rxtx(enum role role, struct session* session, unsigned char* challenge, uint8_t len)
 {
 	switch(role)
@@ -178,9 +173,6 @@ int session_update_challenge_rxtx(enum role role, struct session* session)
 	}
 	return 0;
 }
-
-#define session_update_challenge_rx(...) session_update_challenge_rxtx(ROLE_RX, __VA_ARGS__)
-#define session_update_challenge_tx(...) session_update_challenge_rxtx(ROLE_TX, __VA_ARGS__)
 
 int session_generate_challenge_rxtx(enum role role, struct session* session, unsigned char* buff, uint8_t len)
 {
@@ -372,8 +364,8 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			memcpy(&session->id, packet, HEADER_LENGTH);
 			session_init_challenge_tx(session, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
 			session->state = SESSION_STATE_AUTH;
-//			session->cnt.rx++;
-//			session_update_challenge_rx(session);
+			session->cnt.rx++;
+			session_update_challenge_rx(session);
 			// No processable data in packet, check if transmitable data present immediately
 			session_send_packets(session);
 			break;
@@ -541,8 +533,8 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		memcpy(&session->keyid, packet + SESSION_PACKET_INIT_KEYID_OFFSET, sizeof(uint16_t));
 		session->state = SESSION_STATE_NEW;
 
-//		session->cnt.rx++;
-//		session_update_challenge_rx(session);	
+		session->cnt.rx++;
+		session_update_challenge_rx(session);	
 		unsigned char* txpacket = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
 		if(!txpacket)
 		{

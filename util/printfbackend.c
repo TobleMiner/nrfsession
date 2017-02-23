@@ -32,6 +32,8 @@ void send_packet(void* ctx, struct session* session, unsigned char* addr, uint8_
 		printf("%02x ", session->challenge_rx[i]);
 	}
 	printf(")\n");
+        session->cnt.tx++;
+        session_update_challenge_tx(session);
 	handler_process_packet(handler, data, datalen);
 }
 
