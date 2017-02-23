@@ -25,20 +25,20 @@ int handler_find_session_by_id(struct session_handler* handler, struct sessionid
 	return -ENOENT;
 }
 
-int handler_find_session_by_idab(enum id_side id_side, struct session_handler* handler, uint16_t id, struct session* session)
+int handler_find_session_by_idab(enum id_side id_side, struct session_handler* handler, uint16_t id, struct session** session)
 {
 	unsigned int len = llist_length(handler->sessions);
 	while(len-- > 0)
 	{
-		handler_get_session_at_index(handler, &session, len);
+		handler_get_session_at_index(handler, session, len);
 		switch(id_side)
 		{
 			case(ID_A):
-				if(id == session->id.id_a)
+				if(id == (*session)->id.id_a)
 					return 0;
 				break;
 			case(ID_B):
-				if(id == session->id.id_b)
+				if(id == (*session)->id.id_b)
 					return 0;
 				break;
 			default:
@@ -429,7 +429,7 @@ uint16_t handler_get_free_idab(enum id_side id_side, struct session_handler* han
 #define handler_get_free_ida(...) handler_get_free_idab(ID_A, __VA_ARGS__)
 #define handler_get_free_idb(...) handler_get_free_idab(ID_B, __VA_ARGS__)
 
-struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* data, uint8_t datalen)
+struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen)
 {
 	int err;
 	struct sessionid id;
@@ -446,8 +446,8 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 		err = -ENOMEM;
 		goto exit_err;
 	}
-	memcpy(session->peeraddress.addr, address, addrlen);
-	session->peeraddress.len = addrlen;
+	memcpy(session->peeraddress.addr, peeraddr, peeraddrlen);
+	session->peeraddress.len = peeraddrlen;
 	session_set_tx_data(session, data, datalen);
 	if(!(session->iv_dec = malloc(IV_LENGTH)))
 	{
@@ -501,7 +501,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 	if(id.id_b)
 	{
 		// Find session by id_a
-		if((err = handler_find_session_by_ida(handler, id.id_a, session)))
+		if((err = handler_find_session_by_ida(handler, id.id_a, &session)))
 		{
 			goto exit_err;
 		}
