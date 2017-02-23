@@ -1,4 +1,4 @@
-#ifndef _LIST_H
+#ifndef _LIST_H_
 #define _LIST_H_
 
 struct llist_head;

@@ -5,9 +5,9 @@
 #include <errno.h>
 #include <openssl/hmac.h>
 
-#include "../session/session.h"
+#include "hmac.h"
 
-ssize_t hmac(const EVP_MD *md, unsigned char* msg, uint8_t msglen, unsigned char* key, uint8_t keylen, unsigned char* buff, uint8_t bufflen)
+ssize_t hmac_(const EVP_MD *md, unsigned char* msg, uint8_t msglen, unsigned char* key, uint8_t keylen, unsigned char* buff, uint8_t bufflen)
 {
 	ssize_t err;
 	HMAC_CTX ctx;

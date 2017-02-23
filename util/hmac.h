@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <openssl/hmac.h>
 
-ssize_t hmac(const EVP_MD *md, unsigned char* msg, uint8_t msglen, unsigned char* key, uint8_t keylen, unsigned char* buff, uint8_t bufflen);
+ssize_t hmac_(const EVP_MD *md, unsigned char* msg, uint8_t msglen, unsigned char* key, uint8_t keylen, unsigned char* buff, uint8_t bufflen);
 
-#define hmac_sha1(...) hmac(EVP_sha1(), __VA_ARGS__)
+#define hmac_sha1(...) hmac_(EVP_sha1(), __VA_ARGS__)
 
 #endif

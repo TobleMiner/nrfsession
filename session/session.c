@@ -1,10 +1,12 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "session.h"
 #include "../util/list.h"
 #include "../util/prng.h"
+#include "../util/hmac.h"
 
 enum id_side {
 	ID_A,
@@ -17,7 +19,7 @@ int handler_find_session_by_id(struct session_handler* handler, struct sessionid
 	while(len-- > 0)
 	{
 		handler_get_session_at_index(handler, &session, len);
-		if(!memcmp(id, session->id, sizeof(struct session)))
+		if(!memcmp(id, &session->id, sizeof(struct session)))
 			return 0;
 	}
 	return -ENOENT;
@@ -54,30 +56,30 @@ int handler_get_session_at_index(struct session_handler* handler, struct session
 	return llist_get_value_at_index(handler->sessions, session, index);
 }
 
-int handler_add_session(struct session_handler* handler, struct session_t* session)
+int handler_add_session(struct session_handler* handler, struct session* session)
 {
 	return llist_append(&handler->sessions, session);
 }
 
-void handler_remove_session(struct session_handler* handler, struct session_t* session)
+void handler_remove_session(struct session_handler* handler, struct session* session)
 {
-	llist_remove_value(&handler->sessions, session);
+	llist_remove_data(&handler->sessions, session);
 }
 
 int handler_num_sessions(struct session_handler* handler)
 {
-	return llist_lenght(handler->sessions);
+	return llist_length(handler->sessions);
 }
 
 struct session* alloc_session(struct session_handler* handler, struct sessionid* id)
 {
-	struct session* session = malloc(sizeof(struct session_t));
+	struct session* session = malloc(sizeof(struct session));
 	if(!session)
 	{
 		goto exit_err;
 	}
-	memset(session, 0, sizeof(struct session_t));
-	memcpy(session->id, id, sizeof(struct sessionid));
+	memset(session, 0, sizeof(struct session));
+	memcpy(&session->id, id, sizeof(struct sessionid));
 	session->handler = handler;
 	if(handler && handler_add_session(handler, session))
 	{
@@ -88,11 +90,15 @@ exit_err:
 	return session;
 }
 
-void free_session(struct session_t* session)
+void free_session(struct session* session)
 {
-	if(session->iv)
+	if(session->iv_enc)
 	{
-		free(session->iv);
+		free(session->iv_enc);
+	}
+	if(session->iv_dec)
+	{
+		free(session->iv_dec);
 	}
 	if(session->challenge)
 	{
@@ -117,9 +123,70 @@ struct session_handler* alloc_session_handler()
 
 void free_session_handler(struct session_handler* handler)
 {
+	struct session* session;
 	while(handler_num_sessions(handler))
-		free(handler_get_session_at_index(0));
+	{
+		handler_get_session_at_index(handler, &session, 0);
+		free_session(session);
+	}
 	free(handler);
+}
+
+int session_generate_challenge(struct session* session, unsigned char* buff, uint8_t len)
+{
+	if(len != CHALLENGE_LENGTH)
+	{
+		return -EINVAL;
+	}
+	if(session->handler && false)
+	{
+		if(sizeof(typeof(session->handler->packetcnt)) > len)
+		{
+			return -EINVAL;
+		}
+		memcpy(buff, &session->handler->packetcnt, sizeof(typeof(session->handler->packetcnt)));
+		prng_bytes(buff + sizeof(typeof(session->handler->packetcnt)), len - sizeof(typeof(session->handler->packetcnt)));
+	}
+	else
+	{
+		prng_bytes(buff, len);
+	}
+	memcpy(session->challenge, buff, len);
+	return 0;
+}
+
+int session_validate_hmac(struct session* session, unsigned char* msg, uint8_t msglen, unsigned char* hmac, uint8_t hmaclen)
+{
+	int err;
+	unsigned char* digest = malloc(hmaclen);
+	if(!digest)
+	{
+		err = -ENOMEM;
+		goto exit_err;
+	}
+	if((err = hmac_sha1(msg, msglen, session->key.key, KEY_LENGTH, digest, hmaclen)) < 0)
+	{
+		goto exit_digest;
+	}
+	// TODO: REPLACE WITH CONST TIME MEMCMP!
+	err = memcmp(digest, hmac, hmaclen);
+exit_digest:
+	free(digest);
+exit_err:
+	return err;
+}
+
+// fill header and challenge
+int session_prepare_packet(unsigned char* packet, struct session* session)
+{
+	int err;
+	memcpy(packet, &session->id, sizeof(struct sessionid));
+	if((err = session_generate_challenge(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_LENGTH)))
+	{
+		goto exit_err;
+	}
+exit_err:
+	return err;
 }
 
 int session_process_packet(struct session* session, unsigned char* packet, uint8_t len)
@@ -157,29 +224,6 @@ uint16_t handler_get_free_idab(enum id_side id_side, struct session_handler* han
 #define handler_get_free_ida(...) handler_get_free_idab(ID_A, __VA_ARGS__)
 #define handler_get_free_idb(...) handler_get_free_idab(ID_B, __VA_ARGS__)
 
-int session_new_challenge(struct session* session, unsigned char* buff, uint8_t len)
-{
-	if(len != CHALLENGE_LENGTH)
-	{
-		return -EINVAL;
-	}
-	if(session->handler && false)
-	{
-		if(sizeof(typeof(session->handler->packetcnt)) > len)
-		{
-			return -EINVAL;
-		}
-		memcpy(buff, &session->handler->packetcnt, sizeof(typeof(session->handler->packetcnt)));
-		prng_bytes(buff + sizeof(typeof(session->handler->packetcnt)), len - sizeof(typeof(session->handler->packetcnt)));
-	}
-	else
-	{
-		prng_bytes(buff, len);
-	}
-	memcpy(session->challenge, buff, len);
-	return 0;
-}
-
 int handler_process_packet(struct session_handler* handler, unsigned char* packet, uint8_t len)
 {
 	int err = 0;
@@ -191,10 +235,15 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 	struct sessionid id;
 	struct session* session;
 	memcpy(&id, packet, sizeof(struct sessionid));
+	if(!id.id_a)
+	{
+		err = -EINVAL;
+		goto exit_err;
+	}
 	if(id.id_b)
 	{
 		// Find session by id
-		if((err = handler_find_session_by_id(handler, id.id_b, session)))
+		if((err = handler_find_session_by_id(handler, &id, session)))
 		{
 			goto exit_err;
 		}
@@ -216,19 +265,59 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		}
 		// Keep this dynamic so we can free it once the aes context has
 		// been initialized
-		if(!(session->iv = malloc(IV_LENGTH)))
+		if(!(session->iv_dec = malloc(IV_LENGTH)))
 		{
 			err = -ENOMEM;
 			goto exit_session;
 		}
-		memcpy(session->iv, packet + SESSION_PACKET_INIT_IV_OFFSET, IV_LENGTH);
-		memcpy(session->nrfaddress.addr, packet + SESSION_PACKET_ADDRESS_OFFSET, ADDRESS_LENGTH);
-		session->nrfaddress.len = ADDRESS_LENGTH;
-		memcpy(session->keyid, packet + SESSION_PACKET_INIT_KEYID_OFFSET, sizeof(uint16_t));
+		if(!(session->iv_enc = malloc(IV_LENGTH)))
+		{
+			err = -ENOMEM;
+			goto exit_session;
+		}
+		memcpy(session->iv_dec, packet + SESSION_PACKET_INIT_IV_OFFSET, IV_LENGTH);
+		memcpy(session->peeraddress.addr, packet + SESSION_PACKET_ADDRESS_OFFSET, ADDRESS_LENGTH);
+		session->peeraddress.len = ADDRESS_LENGTH;
+		memcpy(&session->keyid, packet + SESSION_PACKET_INIT_KEYID_OFFSET, sizeof(uint16_t));
 		session->state = SESSION_STATE_NEW;
+		unsigned char* txpacket = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
+		if(!txpacket)
+		{
+			err = -ENOMEM;
+			goto exit_session;
+		}
+		if((err = session_prepare_packet(txpacket, session)))
+		{
+			goto exit_packet;
+		}
+		prng_bytes(txpacket + HEADER_AND_CHALLENGE, IV_LENGTH);
+		unsigned char* msg = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH);
+		if(!msg)
+		{
+			err = -ENOMEM;
+			goto exit_packet;
+		}
+		// Copy packet up to hmac
+		memcpy(msg, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH);
+		// Copy challenge of received packet
+		memcpy(msg + HEADER_AND_CHALLENGE + IV_LENGTH, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
+		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key.key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)))
+		{
+			goto exit_msg;
+		}
+		printf("Tx packet: ");
+		for(int i = 0; i < HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH; i++)
+		{
+			printf("%02x ", txpacket[i]);
+		}
+		printf("\n");
 		return 0;
+exit_msg:
+		free(msg);
+exit_packet:
+		free(packet);
 exit_session:
-		free_session(session);
+		free_session(session); // takes care of IVs
 	}
 exit_err:
 	return err;
