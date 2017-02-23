@@ -10,3 +10,4 @@
 *.out
 *.gch
 *.dep
+.gdb_history
