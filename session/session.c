@@ -297,7 +297,13 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		memcpy(msg, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH);
 		// Copy challenge of received packet
 		memcpy(msg + HEADER_AND_CHALLENGE + IV_LENGTH, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
-		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key.key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)))
+		printf("Tx packet (no hmac): ");
+		for(int i = 0; i < HEADER_AND_CHALLENGE + IV_LENGTH; i++)
+		{
+			printf("%02x ", txpacket[i]);
+		}
+		printf("\n");
+		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key.key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}
