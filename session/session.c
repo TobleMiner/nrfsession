@@ -287,6 +287,13 @@ uint8_t session_read_tx_data(struct session* session, unsigned char* buff, uint8
 	return 0;
 }
 
+void session_set_tx_data(struct session* session, unsigned char* data, uint8_t len)
+{
+	session->tx_data.data = data;
+	session->tx_data.pos = data;
+	session->tx_data.end = data + len;
+}
+
 int session_send_packets(struct session* session)
 {
 	int err;
@@ -420,6 +427,59 @@ uint16_t handler_get_free_idab(enum id_side id_side, struct session_handler* han
 #define handler_get_free_ida(...) handler_get_free_idab(ID_A, __VA_ARGS__)
 #define handler_get_free_idb(...) handler_get_free_idab(ID_B, __VA_ARGS__)
 
+struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* data, uint8_t datalen)
+{
+	int err;
+	struct sessionid id;
+	if(addrlen != ADDRESS_LENGTH)
+	{
+		err = -EINVAL;
+		goto exit_err;
+	}
+	id.id_b = 0;
+	id.id_a = handler_get_free_ida(handler);	
+	struct session* session = alloc_session(handler, &id);
+	if(!session)
+	{
+		err = -ENOMEM;
+		goto exit_err;
+	}
+	memcpy(session->peeraddress.addr, address, addrlen);
+	session->peeraddress.len = addrlen;
+	session_set_tx_data(session, data, datalen);
+	if(!(session->iv_dec = malloc(IV_LENGTH)))
+	{
+		err = -ENOMEM;
+		goto exit_session;
+	}
+	if(!(session->iv_enc = malloc(IV_LENGTH)))
+	{
+		err = -ENOMEM;
+		goto exit_session;
+	}
+	prng_bytes(session->iv_enc, IV_LENGTH);
+	unsigned char* packet = malloc(HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
+	if(!packet)
+	{
+		err = -ENOMEM;
+		goto exit_session;
+	}
+	if((err = session_prepare_packet(packet, session)))
+	{
+		goto exit_packet;
+	}
+	memcpy(packet + SESSION_PACKET_ADDRESS_OFFSET, address, addrlen);
+	memcpy(packet + SESSION_PACKET_INIT_IV_OFFSET, session->iv_enc, IV_LENGTH);
+	session_send_packet(session, packet, HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
+	err = 0;
+exit_packet:
+	free(packet);
+exit_session:
+	free_session(session);
+exit_err:
+	return err;
+}
+
 int handler_process_packet(struct session_handler* handler, unsigned char* packet, uint8_t len)
 {
 	int err = 0;
@@ -438,8 +498,8 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 	}
 	if(id.id_b)
 	{
-		// Find session by id
-		if((err = handler_find_session_by_id(handler, &id, session)))
+		// Find session by id_a
+		if((err = handler_find_session_by_ida(handler, id.id_a, session)))
 		{
 			goto exit_err;
 		}
@@ -471,6 +531,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 			err = -ENOMEM;
 			goto exit_session;
 		}
+		prng_bytes(session->iv_enc, IV_LENGTH);
 		memcpy(session->iv_dec, packet + SESSION_PACKET_INIT_IV_OFFSET, IV_LENGTH);
 		memcpy(session->peeraddress.addr, packet + SESSION_PACKET_ADDRESS_OFFSET, ADDRESS_LENGTH);
 		session->peeraddress.len = ADDRESS_LENGTH;
@@ -486,7 +547,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		{
 			goto exit_packet;
 		}
-		prng_bytes(txpacket + HEADER_AND_CHALLENGE, IV_LENGTH);
+		memcpy(txpacket + HEADER_AND_CHALLENGE, session->iv_enc, IV_LENGTH);
 		unsigned char* msg = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH);
 		if(!msg)
 		{
@@ -502,7 +563,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		{
 			goto exit_msg;
 		}
-		session_send_packet(session, packet, HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
+		session_send_packet(session, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
 		err = 0;
 exit_msg:
 		free(msg);
