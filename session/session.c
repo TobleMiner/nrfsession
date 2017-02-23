@@ -100,10 +100,6 @@ void free_session(struct session* session)
 	{
 		free(session->iv_dec);
 	}
-	if(session->challenge)
-	{
-		free(session->challenge);
-	}
 	if(session->handler)
 	{
 		handler_remove_session(session->handler, session);
@@ -315,7 +311,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 exit_msg:
 		free(msg);
 exit_packet:
-		free(packet);
+		free(txpacket);
 exit_session:
 		free_session(session); // takes care of IVs
 	}

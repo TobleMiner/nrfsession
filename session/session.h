@@ -42,7 +42,7 @@ typedef struct aeskey {
 } aeskey;
 
 typedef struct nrfaddress {
-	unsigned char* addr;
+	unsigned char addr[ADDRESS_LENGTH];
 	uint8_t len;
 } nrfaddress;
 
@@ -52,8 +52,7 @@ typedef struct sessionid {
 } sessionid;
 
 typedef struct psk {
-	//unsigned char[KEY_LENGTH] key;
-	unsigned char* key;
+	unsigned char key[KEY_LENGTH];
 } psk;
 
 typedef struct session {
