@@ -32,8 +32,20 @@ void send_packet(void* ctx, struct session* session, unsigned char* addr, uint8_
 		printf("%02x ", session->challenge_rx[i]);
 	}
 	printf(")\n");
-        session->cnt.tx++;
-        session_update_challenge_tx(session);
+	if(handler->sessions)
+	{
+		struct session* peersession = (struct session*)handler->sessions[0].data;
+	        if(session_len_tx_data(peersession) || (peersession->state != SESSION_STATE_AUTH && !(peersession->state == SESSION_STATE_NEW && session->state == SESSION_STATE_AUTH)))
+		{
+			session->cnt.tx++;
+		        session_update_challenge_tx(session);
+		}
+	}
+	else
+	{
+		session->cnt.tx++;
+	        session_update_challenge_tx(session);
+	}
 	handler_process_packet(handler, data, datalen);
 }
 
@@ -43,7 +55,7 @@ void recv_packet(void* ctx, session* session, unsigned char* data, uint8_t datal
 	printf("RX => ");
 	for(int i = 0; i < datalen; i++)
 	{
-		printf("%02x ", data[i]);
+		printf("%c", data[i]);
 	}
-	printf("(%u)\n", datalen);		
+	printf(" (%u)\n", datalen);		
 }
