@@ -11,13 +11,15 @@
 #define SESSION_MIN_PACKET_LEN	28
 #define SESSION_PACKET_INIT_LEN	31
 #define SESSION_PACKET_AUTH_LEN	28
-#define SESSION_PACKET_DATE_LEN	28
+#define SESSION_PACKET_DATA_LEN	28
 
 #define SESSION_PACKET_CHALLENGE_OFFSET		4
 #define SESSION_PACKET_ADDRESS_OFFSET		8
 #define SESSION_PACKET_INIT_IV_OFFSET		13
 #define SESSION_PACKET_AUTH_IV_OFFSET		8
 #define SESSION_PACKET_INIT_KEYID_OFFSET	29
+#define SESSION_PACKET_NEW_HMAC_OFFSET		24
+#define SESSION_PACKET_AUTH_HMAC_OFFSET		25
 
 #define ADDRESS_LENGTH 5
 
@@ -26,6 +28,9 @@
 
 #define CHALLENGE_LENGTH 4
 #define HMAC_LENGTH 4
+
+#define DATA_LENGTH_LENGTH 1
+#define DATA_LENGTH 16
 
 enum session_state {
 	SESSION_STATE_INIT,
@@ -76,6 +81,8 @@ typedef struct session {
 typedef struct session_handler {
 	uint16_t packetcnt;
 	struct llist_head* sessions;
+	void* ctx;
+	void (*send_packet)(void* ctx, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen);
 } session_handler;
 
 #define HEADER_LENGTH sizeof(struct sessionid)

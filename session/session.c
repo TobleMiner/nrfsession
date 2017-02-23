@@ -107,12 +107,14 @@ void free_session(struct session* session)
 	free(session);
 }
 
-struct session_handler* alloc_session_handler()
+struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen))
 {
 	struct session_handler* handler = malloc(sizeof(struct session_handler));
 	if(handler)
 	{
 		memset(handler, 0, sizeof(struct session_handler));
+		handler->ctx = ctx;
+		handler->send_packet = send_packet;
 	}
 	return handler;
 }
@@ -185,6 +187,23 @@ exit_err:
 	return err;
 }
 
+int session_validate_packet(struct session* session, unsigned char* packet, uint8_t packetlen, unsigned char* hmac, uint8_t hmaclen)
+{
+	int err = 0;
+	unsigned char* fulldata = malloc(packetlen + CHALLENGE_LENGTH);
+	if(!fulldata)
+	{
+		err = -ENOMEM;
+		goto exit_err;
+	}
+	memcpy(fulldata, packet, packetlen);
+	memcpy(fulldata + packetlen, session->challenge, CHALLENGE_LENGTH);
+	err = session_validate_hmac(fulldata, packetlen + CHALLENGE_LENGTH, hmac, hmaclen);
+	free(fulldata);
+exit_err:
+	return err;
+}
+
 int session_process_packet(struct session* session, unsigned char* packet, uint8_t len)
 {
 	int err = 0;
@@ -192,16 +211,46 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 	{
 		// Initiator receives auth response
 		case(SESSION_STATE_INIT):
+			if(len < SESSION_PACKET_AUTH_LEN)
+			{
+				err = -EINVAL;
+				goto exit_err;
+			}
+			if((err = session_validate_packet(session, packet, HEADER_AND_CHALLENGE + IV_LENGTH, packet + SESSION_PACKET_NEW_HMAC_OFFSET, HMAC_LENGTH))
+			{
+				goto exit_err;
+			}
+			session->state = SESSION_STATE_AUTH;
 			break;
 		// Peer receives auth response
 		case(SESSION_STATE_NEW):
+			if(len < SESSION_PACKET_DATA_LEN)
+			{
+				err = -EINVAL;
+				goto exit_err;
+			}
+			if((err = session_validate_packet(session, packet, HEADER_AND_CHALLENGE + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH))
+			{
+				goto exit_err;
+			}
+			session->state = SESSION_STATE_AUTH;
 			break;
 		// Any side receives data
 		case SESSION_STATE_AUTH:
+			if(len < SESSION_PACKET_DATA_LEN)
+			{
+				err = -EINVAL;
+				goto exit_err;
+			}
+			if((err = session_validate_packet(session, packet, HEADER_AND_CHALLENGE + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH))
+			{
+				goto exit_err;
+			}
 			break;
 		default:
 			err = -EINVAL;
 	}
+exit_err:
 	return err;
 }
 
@@ -297,23 +346,12 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		memcpy(msg, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH);
 		// Copy challenge of received packet
 		memcpy(msg + HEADER_AND_CHALLENGE + IV_LENGTH, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
-		printf("Tx packet (no hmac): ");
-		for(int i = 0; i < HEADER_AND_CHALLENGE + IV_LENGTH; i++)
-		{
-			printf("%02x ", txpacket[i]);
-		}
-		printf("\n");
 		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key.key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}
-		printf("Tx packet: ");
-		for(int i = 0; i < HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH; i++)
-		{
-			printf("%02x ", txpacket[i]);
-		}
-		printf("\n");
-		return 0;
+		handler->send_packet(handler->ctx, session->peeraddress.addr, ADDRESS_LENGTH, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
+		err = 0;
 exit_msg:
 		free(msg);
 exit_packet:
