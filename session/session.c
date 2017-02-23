@@ -107,7 +107,7 @@ void free_session(struct session* session)
 	free(session);
 }
 
-struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen))
+struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen), void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen))
 {
 	struct session_handler* handler = malloc(sizeof(struct session_handler));
 	if(handler)
@@ -115,6 +115,7 @@ struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(uns
 		memset(handler, 0, sizeof(struct session_handler));
 		handler->ctx = ctx;
 		handler->send_packet = send_packet;
+		handler->recv_packet = recv_packet;
 	}
 	return handler;
 }
@@ -367,6 +368,7 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			{
 				goto exit_err;
 			}
+			memcpy(&session->id, packet, HEADER_LENGTH);
 			session_init_challenge_tx(session, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
 			session->state = SESSION_STATE_AUTH;
 			session->cnt.rx++;

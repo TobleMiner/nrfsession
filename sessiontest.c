@@ -9,13 +9,15 @@
 
 int main()
 {
-	struct session_handler* handler = alloc_session_handler(NULL, send_packet);
-	unsigned char packet[31] = {0x12, 0x34, 0x00, 0x00,
-				0x11, 0x22, 0x33, 0x44,
-				0x42, 0x42, 0x42, 0x42, 0x42,
-				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-				0xDE, 0xAD};
-	int err = handler_process_packet(handler, packet, 31);
+	struct session_handler* shinji = alloc_session_handler(NULL, send_packet, recv_packet);
+	struct session_handler* asuka = alloc_session_handler(shinji, send_packet, recv_packet);
+	shinji->ctx = asuka;
+	
+	unsigned char addr[5] = {0x42, 0x42, 0x42, 0x42, 0x42};
+	char str[12] = "Hello World!";
+
+	int err;
+	struct session* session = handler_open_session(shinji, addr, 5, (unsigned char*)addr, strlen(addr));
 	printf("err=%d\n", err);
 	printf("sessionsize=%d\n", sizeof(struct session));
 	return 0;

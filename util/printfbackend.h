@@ -5,5 +5,6 @@
 #include "../session/session.h"
 
 void send_packet(void* ctx, struct session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen);
+void recv_packet(void* ctx, session* session, unsigned char* data, uint8_t datalen);
 
 #endif
