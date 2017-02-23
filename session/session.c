@@ -141,14 +141,14 @@ int session_init_challenge_rxtx(enum role role, struct session* session, unsigne
 	switch(role)
 	{
 		case(ROLE_RX):
-			if(len != CHALLENGE_LENGTH - sizeof(typeof(session->cnt.rx)))
+			if(len != CHALLENGE_LENGTH)
 			{
 				return -EINVAL;
 			}
 			memcpy(session->challenge_rx + sizeof(typeof(session->cnt.rx)), challenge + sizeof(typeof(session->cnt.rx)), len - sizeof(typeof(session->cnt.rx)));
 			break;
 		case(ROLE_TX):
-			if(len != CHALLENGE_LENGTH - sizeof(typeof(session->cnt.tx)))
+			if(len != CHALLENGE_LENGTH)
 			{
 				return -EINVAL;
 			}
@@ -304,6 +304,7 @@ int session_send_packets(struct session* session)
 		if(len > DATA_LENGTH)
 			len = DATA_LENGTH;
 		unsigned char* packet = malloc(HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + HMAC_LENGTH);
+		memset(packet, 0, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + HMAC_LENGTH);
 		if(!packet)
 		{
 			err = -ENOMEM;
@@ -371,8 +372,8 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			memcpy(&session->id, packet, HEADER_LENGTH);
 			session_init_challenge_tx(session, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
 			session->state = SESSION_STATE_AUTH;
-			session->cnt.rx++;
-			session_update_challenge_rx(session);
+//			session->cnt.rx++;
+//			session_update_challenge_rx(session);
 			// No processable data in packet, check if transmitable data present immediately
 			session_send_packets(session);
 			break;
@@ -539,6 +540,9 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		session->peeraddress.len = ADDRESS_LENGTH;
 		memcpy(&session->keyid, packet + SESSION_PACKET_INIT_KEYID_OFFSET, sizeof(uint16_t));
 		session->state = SESSION_STATE_NEW;
+
+//		session->cnt.rx++;
+//		session_update_challenge_rx(session);	
 		unsigned char* txpacket = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
 		if(!txpacket)
 		{

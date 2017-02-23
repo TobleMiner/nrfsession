@@ -19,7 +19,19 @@ void send_packet(void* ctx, struct session* session, unsigned char* addr, uint8_
 	{
 		printf("%02x ", data[i]);
 	}
-	printf("(%u)\n", datalen);
+	printf("(%u) ", datalen);
+	printf("TX: (");
+	for(int i = 0; i < CHALLENGE_LENGTH; i++)
+	{
+		printf("%02x ", session->challenge_tx[i]);
+	}
+	printf(") ");
+	printf("RX: (");
+	for(int i = 0; i < CHALLENGE_LENGTH; i++)
+	{
+		printf("%02x ", session->challenge_rx[i]);
+	}
+	printf(")\n");
 	handler_process_packet(handler, data, datalen);
 }
 
