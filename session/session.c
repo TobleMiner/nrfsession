@@ -363,12 +363,6 @@ int session_validate_and_maybe_decrypt_packet(uint8_t decrypt, struct session* s
 			printf("%02x ", (fulldata + SESSION_PACKET_DATA_OFFSET)[i]);
 		}
 		printf("\n");
-		printf("pre(DEC): ");
-		for(int i = 0; i < DATA_LENGTH; i++)
-		{
-			printf("%c", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
-		}
-		printf("\n");
 		aes_decrypt(&session->aes_dec, fulldata + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH, packet + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH);
 		printf("DEC: ");
 		for(int i = 0; i < DATA_LENGTH; i++)
