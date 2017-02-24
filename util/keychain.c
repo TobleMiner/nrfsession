@@ -29,13 +29,13 @@ exit_err:
 
 void free_keychain(struct keychain* keychain)
 {
-	free(keychain);
 	struct key** keys = keychain->keys;
 	while(*keys)
 	{
 		free(*keys);
 		keys++;
 	}
+	free(keychain);
 }
 
 int keychain_add_key(struct keychain* keychain, struct key* key)

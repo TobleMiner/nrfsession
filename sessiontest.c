@@ -31,5 +31,9 @@ int main()
 	struct session* session = handler_open_session(shinji, keyid, addr, 5, peeraddr, 5, (unsigned char*)str, strlen(str) + 1);
 	printf("err=%d\n", err);
 	printf("sessionsize=%d\n", sizeof(struct session));
+	free_session(session);
+	free_session_handler(shinji);
+	free_session_handler(asuka);
+	free_keychain(chain);
 	return 0;
 }

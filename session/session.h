@@ -110,5 +110,7 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 int session_update_challenge_rxtx(enum role role, struct session* session);
 #define session_update_challenge_rx(...) session_update_challenge_rxtx(ROLE_RX, __VA_ARGS__)
 #define session_update_challenge_tx(...) session_update_challenge_rxtx(ROLE_TX, __VA_ARGS__)
+void free_session(struct session* session);
+void free_session_handler(struct session_handler* handler);
 
 #endif
