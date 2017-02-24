@@ -232,7 +232,7 @@ int session_validate_hmac(struct session* session, unsigned char* msg, uint8_t m
 		err = -ENOMEM;
 		goto exit_err;
 	}
-	if((err = hmac_sha1(msg, msglen, session->key.key, KEY_LENGTH, digest, hmaclen)) < 0)
+	if((err = hmac_sha1(msg, msglen, session->key->key, KEY_LENGTH, digest, hmaclen)) < 0)
 	{
 		goto exit_digest;
 	}
@@ -313,7 +313,7 @@ int session_send_packets(struct session* session)
 		}
 		memcpy(msg, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH);
 		memcpy(msg + HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, session->challenge_tx, CHALLENGE_LENGTH);
-		if((err = hmac_sha1(msg, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH, session->key.key, KEY_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)) < 0)
+		if((err = hmac_sha1(msg, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}
@@ -422,7 +422,7 @@ uint16_t handler_get_free_idab(enum id_side id_side, struct session_handler* han
 #define handler_get_free_ida(...) handler_get_free_idab(ID_A, __VA_ARGS__)
 #define handler_get_free_idb(...) handler_get_free_idab(ID_B, __VA_ARGS__)
 
-struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen)
+struct session* handler_open_session(struct session_handler* handler, unsigned char* keyid, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen)
 {
 	struct sessionid id;
 	struct session* session = NULL;
@@ -436,6 +436,11 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 	if(!session)
 	{
 		goto exit_err;
+	}
+	session->key = keychain_get_key(handler->keychain, keyid);
+	if(!session->key)
+	{
+		goto exit_session;
 	}
 	memcpy(session->peeraddress.addr, peeraddr, peeraddrlen);
 	session->peeraddress.len = peeraddrlen;
@@ -460,6 +465,7 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 	}
 	memcpy(packet + SESSION_PACKET_ADDRESS_OFFSET, address, addrlen);
 	memcpy(packet + SESSION_PACKET_INIT_IV_OFFSET, session->iv_enc, IV_LENGTH);
+	memcpy(packet + SESSION_PACKET_INIT_KEYID_OFFSET, keyid, KEYID_LENGTH);
 	session_send_packet(session, packet, HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
 	free(packet);
 	return session;
@@ -498,17 +504,24 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 	}
 	else
 	{
-		// New session
 		if(!id.id_a || len < SESSION_PACKET_INIT_LEN)
 		{
 			err = -EINVAL;
 			goto exit_err;
 		}
+		// New session
 		id.id_b = handler_get_free_idb(handler);
 		if(!(session = alloc_session(handler, &id)))
 		{
 			err = -ENOMEM;
 			goto exit_err;
+		}
+		// Look up keyid
+		session->key = keychain_get_key(handler->keychain, packet + SESSION_PACKET_INIT_KEYID_OFFSET);
+		if(!session->key)
+		{
+			err = -EINVAL;
+			goto exit_session;
 		}
 		// Keep this dynamic so we can free it once the aes context has
 		// been initialized
@@ -528,9 +541,9 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		session->peeraddress.len = ADDRESS_LENGTH;
 		memcpy(&session->keyid, packet + SESSION_PACKET_INIT_KEYID_OFFSET, sizeof(uint16_t));
 		session->state = SESSION_STATE_NEW;
-
 		session->cnt.rx++;
 		session_update_challenge_rx(session);	
+
 		unsigned char* txpacket = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
 		if(!txpacket)
 		{
@@ -553,7 +566,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		// Copy challenge of received packet
 		memcpy(msg + HEADER_AND_CHALLENGE + IV_LENGTH, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
 		session_init_challenge_tx(session, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
-		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key.key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)) < 0)
+		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}

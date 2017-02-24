@@ -25,12 +25,15 @@
 
 #define IV_LENGTH 16
 #define KEY_LENGTH 16
+#define KEYID_LENGTH sizeof(uint16_t)
 
 #define CHALLENGE_LENGTH 4
 #define HMAC_LENGTH 4
 
 #define DATA_LENGTH_LENGTH 1
 #define DATA_LENGTH 16
+
+#include "../util/keychain.h"
 
 enum session_state {
 	SESSION_STATE_INIT,
@@ -51,10 +54,6 @@ typedef struct sessionid {
 	uint16_t id_b;
 } sessionid;
 
-typedef struct psk {
-	unsigned char key[KEY_LENGTH];
-} psk;
-
 typedef struct packet_counter {
 	uint16_t rx;
 	uint16_t tx;
@@ -71,7 +70,7 @@ typedef struct session {
 	struct sessionid id;
 	struct nrfaddress peeraddress;
 	struct aes_ctx aes;
-	struct psk key;
+	struct key* key;
 	struct packet_counter cnt;
 	struct tx_data tx_data;
 	unsigned char challenge_tx[CHALLENGE_LENGTH];
@@ -90,6 +89,7 @@ typedef struct session {
 typedef struct session_handler {
 	uint16_t packetcnt;
 	struct llist_head* sessions;
+	struct keychain* keychain;
 	void* ctx;
 	void (*send_packet)(void* ctx, session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen);
 	void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen); 
@@ -97,7 +97,6 @@ typedef struct session_handler {
 
 #define HEADER_LENGTH sizeof(struct sessionid)
 #define HEADER_AND_CHALLENGE HEADER_LENGTH + CHALLENGE_LENGTH
-#define KEYID_LENGTH sizeof(uint16_t)
 
 enum role {
         ROLE_RX,
@@ -107,7 +106,7 @@ enum role {
 int handler_process_packet(struct session_handler* handler, unsigned char* packet, uint8_t len);
 struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(void* ctx, session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen), void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen));
 int handler_get_session_at_index(struct session_handler* handler, struct session** session, int index);
-struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen);
+struct session* handler_open_session(struct session_handler* handler, unsigned char* keyid, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen);
 int session_update_challenge_rxtx(enum role role, struct session* session);
 #define session_update_challenge_rx(...) session_update_challenge_rxtx(ROLE_RX, __VA_ARGS__)
 #define session_update_challenge_tx(...) session_update_challenge_rxtx(ROLE_TX, __VA_ARGS__)
