@@ -107,7 +107,7 @@ void free_session(struct session* session)
 	free(session);
 }
 
-struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen), void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen))
+struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(void* ctx, session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen), void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen))
 {
 	struct session_handler* handler = malloc(sizeof(struct session_handler));
 	if(handler)
@@ -424,19 +424,17 @@ uint16_t handler_get_free_idab(enum id_side id_side, struct session_handler* han
 
 struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen)
 {
-	int err;
 	struct sessionid id;
+	struct session* session = NULL;
 	if(addrlen != ADDRESS_LENGTH)
 	{
-		err = -EINVAL;
 		goto exit_err;
 	}
 	id.id_b = 0;
 	id.id_a = handler_get_free_ida(handler);	
-	struct session* session = alloc_session(handler, &id);
+	session = alloc_session(handler, &id);
 	if(!session)
 	{
-		err = -ENOMEM;
 		goto exit_err;
 	}
 	memcpy(session->peeraddress.addr, peeraddr, peeraddrlen);
@@ -444,35 +442,33 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 	session_set_tx_data(session, data, datalen);
 	if(!(session->iv_dec = malloc(IV_LENGTH)))
 	{
-		err = -ENOMEM;
 		goto exit_session;
 	}
 	if(!(session->iv_enc = malloc(IV_LENGTH)))
 	{
-		err = -ENOMEM;
 		goto exit_session;
 	}
 	prng_bytes(session->iv_enc, IV_LENGTH);
 	unsigned char* packet = malloc(HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
 	if(!packet)
 	{
-		err = -ENOMEM;
 		goto exit_session;
 	}
-	if((err = session_prepare_packet(packet, session)))
+	if(session_prepare_packet(packet, session))
 	{
 		goto exit_packet;
 	}
 	memcpy(packet + SESSION_PACKET_ADDRESS_OFFSET, address, addrlen);
 	memcpy(packet + SESSION_PACKET_INIT_IV_OFFSET, session->iv_enc, IV_LENGTH);
 	session_send_packet(session, packet, HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
-	err = 0;
+	free(packet);
+	return session;
 exit_packet:
 	free(packet);
 exit_session:
 	free_session(session);
 exit_err:
-	return err;
+	return NULL;
 }
 
 int handler_process_packet(struct session_handler* handler, unsigned char* packet, uint8_t len)

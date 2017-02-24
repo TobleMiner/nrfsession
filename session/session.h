@@ -110,8 +110,7 @@ enum role {
 };
 
 int handler_process_packet(struct session_handler* handler, unsigned char* packet, uint8_t len);
-struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen), void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen));
-struct session_handler* alloc_session_handler();
+struct session_handler* alloc_session_handler(void* ctx, void (*send_packet)(void* ctx, session* session, unsigned char* addr, uint8_t addrlen, unsigned char* data, uint8_t datalen), void (*recv_packet)(void* ctx, session* session, unsigned char* data, uint8_t datalen));
 int handler_get_session_at_index(struct session_handler* handler, struct session** session, int index);
 struct session* handler_open_session(struct session_handler* handler, unsigned char* address, uint8_t addrlen, unsigned char* peeraddr, uint8_t peeraddrlen, unsigned char* data, uint8_t datalen);
 int session_update_challenge_rxtx(enum role role, struct session* session);
