@@ -353,6 +353,7 @@ int session_validate_and_maybe_decrypt_packet(uint8_t decrypt, struct session* s
 	}
 	memcpy(fulldata, packet, packetlen);
 	memcpy(fulldata + packetlen, session->challenge_rx, CHALLENGE_LENGTH);
+	err = session_validate_hmac(session, fulldata, packetlen + CHALLENGE_LENGTH, hmac, hmaclen);
 	if(decrypt)
 	{
 		aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
@@ -376,7 +377,6 @@ int session_validate_and_maybe_decrypt_packet(uint8_t decrypt, struct session* s
 		}
 		printf("\n");
 	}
-	err = session_validate_hmac(session, fulldata, packetlen + CHALLENGE_LENGTH, hmac, hmaclen);
 	free(fulldata);
 exit_err:
 	return err;
