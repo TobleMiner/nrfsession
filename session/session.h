@@ -41,11 +41,6 @@ enum session_state {
 
 struct session_handler;
 
-typedef struct aeskey {
-	unsigned char* key;
-	unsigned char* iv;
-} aeskey;
-
 typedef struct nrfaddress {
 	unsigned char addr[ADDRESS_LENGTH];
 	uint8_t len;
