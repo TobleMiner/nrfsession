@@ -313,6 +313,20 @@ int session_send_packets(struct session* session)
 		}
 		memcpy(msg, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH);
 		memcpy(msg + HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, session->challenge_tx, CHALLENGE_LENGTH);
+		printf("ENC: ");
+		for(int i = 0; i < DATA_LENGTH; i++)
+		{
+			printf("%c", (msg + SESSION_PACKET_DATA_OFFSET)[i]);
+		}
+		printf("\n");
+		aes_encrypt(&session->aes_enc, msg + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH, packet + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH);
+		printf("hex(ENC): ");
+		for(int i = 0; i < DATA_LENGTH; i++)
+		{
+			printf("%02x ", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
+		}
+		printf("\n");
+		memcpy(msg + SESSION_PACKET_DATA_OFFSET, packet + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH);
 		if((err = hmac_sha1(msg, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
@@ -328,7 +342,7 @@ exit_err:
 	return err;
 }
 
-int session_validate_packet(struct session* session, unsigned char* packet, uint8_t packetlen, unsigned char* hmac, uint8_t hmaclen)
+int session_validate_and_maybe_decrypt_packet(uint8_t decrypt, struct session* session, unsigned char* packet, uint8_t packetlen, unsigned char* hmac, uint8_t hmaclen)
 {
 	int err = 0;
 	unsigned char* fulldata = malloc(packetlen + CHALLENGE_LENGTH);
@@ -339,11 +353,38 @@ int session_validate_packet(struct session* session, unsigned char* packet, uint
 	}
 	memcpy(fulldata, packet, packetlen);
 	memcpy(fulldata + packetlen, session->challenge_rx, CHALLENGE_LENGTH);
+	if(decrypt)
+	{
+		aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
+		printf("hex(DEC): ");
+		for(int i = 0; i < DATA_LENGTH; i++)
+		{
+			printf("%02x ", (fulldata + SESSION_PACKET_DATA_OFFSET)[i]);
+		}
+		printf("\n");
+		printf("pre(DEC): ");
+		for(int i = 0; i < DATA_LENGTH; i++)
+		{
+			printf("%c", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
+		}
+		printf("\n");
+		aes_decrypt(&session->aes_dec, fulldata + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH, packet + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH);
+		printf("DEC: ");
+		for(int i = 0; i < DATA_LENGTH; i++)
+		{
+			printf("%c", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
+		}
+		printf("\n");
+	}
 	err = session_validate_hmac(session, fulldata, packetlen + CHALLENGE_LENGTH, hmac, hmaclen);
 	free(fulldata);
 exit_err:
 	return err;
 }
+
+#define session_validate_packet(...) session_validate_and_maybe_decrypt_packet(false, __VA_ARGS__)
+#define session_validate_and_decrypt_packet(...) session_validate_and_maybe_decrypt_packet(true, __VA_ARGS__)
+
 
 int session_process_packet(struct session* session, unsigned char* packet, uint8_t len)
 {
@@ -366,6 +407,9 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			session->state = SESSION_STATE_AUTH;
 			session->cnt.rx++;
 			session_update_challenge_rx(session);
+			memcpy(session->iv_dec, packet + SESSION_PACKET_AUTH_IV_OFFSET, IV_LENGTH);
+			aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
+			aes_init_encrypt_128(&session->aes_enc, session->iv_enc, IV_LENGTH, session->key->key, KEY_LENGTH);
 			// No processable data in packet, check if transmitable data present immediately
 			session_send_packets(session);
 			break;
@@ -376,7 +420,9 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 				err = -EINVAL;
 				goto exit_err;
 			}
-			if((err = session_validate_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)))
+			aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
+			aes_init_encrypt_128(&session->aes_enc, session->iv_enc, IV_LENGTH, session->key->key, KEY_LENGTH);
+			if((err = session_validate_and_decrypt_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)))
 			{
 				goto exit_err;
 			}
@@ -392,7 +438,7 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 				err = -EINVAL;
 				goto exit_err;
 			}
-			if((err = session_validate_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)))
+			if((err = session_validate_and_decrypt_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)))
 			{
 				goto exit_err;
 			}
@@ -554,7 +600,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		{
 			goto exit_packet;
 		}
-		memcpy(txpacket + HEADER_AND_CHALLENGE, session->iv_enc, IV_LENGTH);
+		memcpy(txpacket + SESSION_PACKET_AUTH_IV_OFFSET, session->iv_enc, IV_LENGTH);
 		unsigned char* msg = malloc(HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH);
 		if(!msg)
 		{

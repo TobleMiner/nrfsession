@@ -3,15 +3,12 @@
 
 #include <stdint.h>
 
-#include "../util/list.h"
-#include "../util/aes.h"
-
 #define SESSION_PACKET_LEN 32
 
 #define SESSION_MIN_PACKET_LEN	24
 #define SESSION_PACKET_INIT_LEN	31
 #define SESSION_PACKET_AUTH_LEN	28
-#define SESSION_PACKET_DATA_LEN	24
+#define SESSION_PACKET_DATA_LEN	25
 
 #define SESSION_PACKET_CHALLENGE_OFFSET		4
 #define SESSION_PACKET_ADDRESS_OFFSET		8
@@ -20,6 +17,7 @@
 #define SESSION_PACKET_INIT_KEYID_OFFSET	29
 #define SESSION_PACKET_NEW_HMAC_OFFSET		24
 #define SESSION_PACKET_AUTH_HMAC_OFFSET		21
+#define SESSION_PACKET_DATA_OFFSET		HEADER_LENGTH + DATA_LENGTH_LENGTH
 
 #define ADDRESS_LENGTH 5
 
@@ -33,6 +31,8 @@
 #define DATA_LENGTH_LENGTH 1
 #define DATA_LENGTH 16
 
+#include "../util/list.h"
+#include "../util/aes.h"
 #include "../util/keychain.h"
 
 enum session_state {
@@ -69,7 +69,8 @@ typedef struct session {
 	struct session_handler* handler;
 	struct sessionid id;
 	struct nrfaddress peeraddress;
-	struct aes_ctx aes;
+	struct aes_ctx aes_dec;
+	struct aes_ctx aes_enc;
 	struct key* key;
 	struct packet_counter cnt;
 	struct tx_data tx_data;

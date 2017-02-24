@@ -30,13 +30,13 @@ int aes_init_endecrypt(enum mode mode, const EVP_CIPHER* cipher, uint8_t blocksi
 	switch(mode)
 	{
 		case DECRYPT:
-			if(EVP_DecryptInit_ex(&ctx->ctx, EVP_aes_128_cbc(), NULL, key, iv) != 1)
+			if(EVP_DecryptInit_ex(&ctx->ctx, cipher, NULL, key, iv) != 1)
 			{
 				return -1;
 			}
 			break;
 		case ENCRYPT:
-			if(EVP_EncryptInit_ex(&ctx->ctx, EVP_aes_128_cbc(), NULL, key, iv) != 1)
+			if(EVP_EncryptInit_ex(&ctx->ctx, cipher, NULL, key, iv) != 1)
 			{
 				return -1;
 			}
@@ -59,6 +59,7 @@ ssize_t aes_deencrypt(enum mode mode, struct aes_ctx* ctx, unsigned char* msg, u
 			{
 				return -1;
 			}
+			EVP_DecryptFinal_ex(&ctx->ctx, buff + len, &len);
 			break;
 		case(ENCRYPT):
 			if(EVP_EncryptUpdate(&ctx->ctx, buff, &len, msg, msglen) != 1)

@@ -25,7 +25,7 @@ int main()
 
 	unsigned char addr[5] = {0x13, 0x37, 0x13, 0x37, 0x55};
 	unsigned char peeraddr[5] = {0x42, 0x42, 0x42, 0x42, 0x42};
-	char str[32] = "Hello World! Foo bar baz foobar";
+	char str[64] = "Hello World! Foo bar baz foobar - Lorem ipsum dolor sit amet";
 
 	int err;
 	struct session* session = handler_open_session(shinji, keyid, addr, 5, peeraddr, 5, (unsigned char*)str, strlen(str) + 1);
