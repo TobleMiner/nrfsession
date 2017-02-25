@@ -136,18 +136,18 @@ int session_init_challenge_rxtx(enum role role, struct session* session, unsigne
 	switch(role)
 	{
 		case(ROLE_RX):
-			if(len != CHALLENGE_LENGTH)
+			if(len != CHALLENGE_RND_LENGTH)
 			{
 				return -EINVAL;
 			}
-			memcpy(session->challenge_rx + sizeof(typeof(session->cnt.rx)), challenge + sizeof(typeof(session->cnt.rx)), len - sizeof(typeof(session->cnt.rx)));
+			memcpy(session->challenge_rx + CHALLENGE_CNT_LENGTH, challenge, len);
 			break;
 		case(ROLE_TX):
-			if(len != CHALLENGE_LENGTH)
+			if(len > CHALLENGE_RND_LENGTH)
 			{
 				return -EINVAL;
 			}
-			memcpy(session->challenge_tx + sizeof(typeof(session->cnt.tx)), challenge + sizeof(typeof(session->cnt.tx)), len - sizeof(typeof(session->cnt.tx)));
+			memcpy(session->challenge_tx + CHALLENGE_CNT_LENGTH, challenge, len);
 			break;
 		default:
 			return -EINVAL;
@@ -163,10 +163,10 @@ int session_update_challenge_rxtx(enum role role, struct session* session)
 	switch(role)
 	{
 		case(ROLE_RX):
-			memcpy(session->challenge_rx, &session->cnt.rx, sizeof(typeof(session->cnt.rx)));			
+			memcpy(session->challenge_rx, &session->cnt.rx, CHALLENGE_CNT_LENGTH);			
 			break;
 		case(ROLE_TX):
-			memcpy(session->challenge_tx, &session->cnt.tx, sizeof(typeof(session->cnt.tx)));
+			memcpy(session->challenge_tx, &session->cnt.tx, CHALLENGE_CNT_LENGTH);
 			break;
 		default:
 			return -EINVAL;
@@ -174,31 +174,19 @@ int session_update_challenge_rxtx(enum role role, struct session* session)
 	return 0;
 }
 
-int session_generate_challenge_rxtx(enum role role, struct session* session, unsigned char* buff, uint8_t len)
+int session_generate_challenge_rxtx(enum role role, struct session* session, unsigned char* buff)
 {
-	if(len != CHALLENGE_LENGTH)
-	{
-		return -EINVAL;
-	}
 	switch(role)
 	{
-		case ROLE_TX:
-			if(sizeof(typeof(session->cnt.tx)) > len)
-			{
-				return -EINVAL;
-			}
-			memcpy(buff, &session->cnt.tx, sizeof(typeof(session->cnt.tx)));
-			prng_bytes(buff + sizeof(typeof(session->cnt.tx)), len - sizeof(typeof(session->cnt.tx)));
-			memcpy(session->challenge_tx, buff, len);
-			break;
 		case ROLE_RX:
-			if(sizeof(typeof(session->cnt.rx)) > len)
-			{
-				return -EINVAL;
-			}
-			memcpy(buff, &session->cnt.rx, sizeof(typeof(session->cnt.rx)));
-			prng_bytes(buff + sizeof(typeof(session->cnt.rx)), len - sizeof(typeof(session->cnt.rx)));
-			memcpy(session->challenge_rx, buff, len);
+			memcpy(session->challenge_rx, &session->cnt.rx, CHALLENGE_CNT_LENGTH);
+			prng_bytes(buff, CHALLENGE_RND_LENGTH);
+			memcpy(session->challenge_rx + CHALLENGE_CNT_LENGTH, buff, CHALLENGE_RND_LENGTH);
+			break;
+		case ROLE_TX:
+			memcpy(session->challenge_tx, &session->cnt.tx, CHALLENGE_CNT_LENGTH);
+			prng_bytes(buff, CHALLENGE_RND_LENGTH);
+			memcpy(session->challenge_tx + CHALLENGE_CNT_LENGTH, buff, CHALLENGE_RND_LENGTH);
 			break;
 		default:
 			return -EINVAL;
@@ -249,7 +237,7 @@ int session_prepare_packet(unsigned char* packet, struct session* session)
 {
 	int err;
 	memcpy(packet, &session->id, sizeof(struct sessionid));
-	if((err = session_generate_challenge_rx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_LENGTH)))
+	if((err = session_generate_challenge_rx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET)))
 	{
 		goto exit_err;
 	}
@@ -397,7 +385,7 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 				goto exit_err;
 			}
 			memcpy(&session->id, packet, HEADER_LENGTH);
-			session_init_challenge_tx(session, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
+			session_init_challenge_tx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_RND_LENGTH);
 			session->state = SESSION_STATE_AUTH;
 			session->cnt.rx++;
 			session_update_challenge_rx(session);
@@ -494,7 +482,7 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 		goto exit_session;
 	}
 	prng_bytes(session->iv_enc, IV_LENGTH);
-	unsigned char* packet = malloc(HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
+	unsigned char* packet = malloc(SESSION_PACKET_INIT_LEN);
 	if(!packet)
 	{
 		goto exit_session;
@@ -506,7 +494,7 @@ struct session* handler_open_session(struct session_handler* handler, unsigned c
 	memcpy(packet + SESSION_PACKET_ADDRESS_OFFSET, address, addrlen);
 	memcpy(packet + SESSION_PACKET_INIT_IV_OFFSET, session->iv_enc, IV_LENGTH);
 	memcpy(packet + SESSION_PACKET_INIT_KEYID_OFFSET, keyid, KEYID_LENGTH);
-	session_send_packet(session, packet, HEADER_AND_CHALLENGE + ADDRESS_LENGTH + IV_LENGTH + KEYID_LENGTH);
+	session_send_packet(session, packet, SESSION_PACKET_INIT_LEN);
 	free(packet);
 	return session;
 exit_packet:
@@ -579,7 +567,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		memcpy(session->iv_dec, packet + SESSION_PACKET_INIT_IV_OFFSET, IV_LENGTH);
 		memcpy(session->peeraddress.addr, packet + SESSION_PACKET_ADDRESS_OFFSET, ADDRESS_LENGTH);
 		session->peeraddress.len = ADDRESS_LENGTH;
-		memcpy(&session->keyid, packet + SESSION_PACKET_INIT_KEYID_OFFSET, sizeof(uint16_t));
+		session_init_challenge_tx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_RND_LENGTH);
 		session->state = SESSION_STATE_NEW;
 		session->cnt.rx++;
 		session_update_challenge_rx(session);	
@@ -604,8 +592,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		// Copy packet up to hmac
 		memcpy(msg, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH);
 		// Copy challenge of received packet
-		memcpy(msg + SESSION_PACKET_NEW_HMAC_OFFSET, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_LENGTH);
-		session_init_challenge_tx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_LENGTH);
+		memcpy(msg + SESSION_PACKET_NEW_HMAC_OFFSET, session->challenge_tx, CHALLENGE_LENGTH);
 		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, txpacket + SESSION_PACKET_NEW_HMAC_OFFSET, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
