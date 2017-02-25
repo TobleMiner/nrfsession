@@ -174,8 +174,12 @@ int session_update_challenge_rxtx(enum role role, struct session* session)
 	return 0;
 }
 
-int session_generate_challenge_rxtx(enum role role, struct session* session, unsigned char* buff)
+int session_generate_challenge_rxtx(enum role role, struct session* session, unsigned char* buff, uint8_t len)
 {
+	if(len < CHALLENGE_RND_LENGTH)
+	{
+		return -EINVAL;
+	}
 	switch(role)
 	{
 		case ROLE_RX:
@@ -237,7 +241,7 @@ int session_prepare_packet(unsigned char* packet, struct session* session)
 {
 	int err;
 	memcpy(packet, &session->id, sizeof(struct sessionid));
-	if((err = session_generate_challenge_rx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET)))
+	if((err = session_generate_challenge_rx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_RND_LENGTH)))
 	{
 		goto exit_err;
 	}
