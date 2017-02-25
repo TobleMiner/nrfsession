@@ -295,23 +295,23 @@ int session_send_packets(struct session* session)
 	{
 		if(len > DATA_LENGTH)
 			len = DATA_LENGTH;
-		unsigned char* packet = malloc(HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + HMAC_LENGTH);
-		memset(packet, 0, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + HMAC_LENGTH);
+		unsigned char* packet = malloc(SESSION_PACKET_DATA_LEN);
+		memset(packet, 0, SESSION_PACKET_DATA_LEN);
 		if(!packet)
 		{
 			err = -ENOMEM;
 			goto exit_err;
 		}
 		memcpy(packet, &session->id, sizeof(struct sessionid));
-		len = session_read_tx_data(session, packet + HEADER_LENGTH + DATA_LENGTH_LENGTH, len);
-		memcpy(packet + HEADER_LENGTH, &len, DATA_LENGTH_LENGTH);
+		len = session_read_tx_data(session, packet + SESSION_PACKET_DATA_OFFSET, len);
+		memcpy(packet + SESSION_PACKET_DATA_LENGTH_OFFSET, &len, DATA_LENGTH_LENGTH);
 		unsigned char* msg = malloc(HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH);
 		if(!msg)
 		{
 			err = -ENOMEM;
 			goto exit_packet;
 		}
-		memcpy(msg, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH);
+		memcpy(msg, packet, SESSION_PACKET_DATA_LEN);
 		memcpy(msg + HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, session->challenge_tx, CHALLENGE_LENGTH);
 		printf("ENC: ");
 		for(int i = 0; i < DATA_LENGTH; i++)
@@ -331,7 +331,7 @@ int session_send_packets(struct session* session)
 		{
 			goto exit_msg;
 		}
-		session_send_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + HMAC_LENGTH);
+		session_send_packet(session, packet, SESSION_PACKET_DATA_LEN);
 		err = 0;
 exit_msg:
 		free(msg);
@@ -604,13 +604,13 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		// Copy packet up to hmac
 		memcpy(msg, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH);
 		// Copy challenge of received packet
-		memcpy(msg + HEADER_AND_CHALLENGE + IV_LENGTH, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
-		session_init_challenge_tx(session, packet + HEADER_LENGTH, CHALLENGE_LENGTH);
-		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, txpacket + HEADER_AND_CHALLENGE + IV_LENGTH, HMAC_LENGTH)) < 0)
+		memcpy(msg + SESSION_PACKET_NEW_HMAC_OFFSET, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_LENGTH);
+		session_init_challenge_tx(session, packet + SESSION_PACKET_CHALLENGE_OFFSET, CHALLENGE_LENGTH);
+		if((err = hmac_sha1(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, txpacket + SESSION_PACKET_NEW_HMAC_OFFSET, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}
-		session_send_packet(session, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH + HMAC_LENGTH);
+		session_send_packet(session, txpacket, SESSION_PACKET_AUTH_LEN);
 		err = 0;
 exit_msg:
 		free(msg);
