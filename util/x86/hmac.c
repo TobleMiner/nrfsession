@@ -1,11 +1,11 @@
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
-#include <malloc.h>
 #include <errno.h>
 #include <openssl/hmac.h>
 
-#include "hmac.h"
+#include "../hmac.h"
 
 ssize_t hmac_(const EVP_MD *md, unsigned char* msg, uint8_t msglen, unsigned char* key, uint8_t keylen, unsigned char* buff, uint8_t bufflen)
 {

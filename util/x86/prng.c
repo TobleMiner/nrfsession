@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "prng.h"
+#include "../prng.h"
 
 uint32_t prng_uint32()
 {

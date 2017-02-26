@@ -1,10 +1,9 @@
 #include <stdint.h>
-#include <malloc.h>
 #include <string.h>
 #include <errno.h>
 #include <openssl/evp.h>
 
-#include "aes.h"
+#include "../aes.h"
 
 int aes_init(uint8_t blocksize, struct aes_ctx* ctx, uint8_t ivlen, uint8_t keylen)
 {

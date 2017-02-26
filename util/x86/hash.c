@@ -1,12 +1,11 @@
 #include <stdlib.h>
-#include <malloc.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
 
 #include <openssl/evp.h>
 
-#include "hash.h"
+#include "../hash.h"
 
 int sha1(unsigned char* msg, uint8_t msglen, unsigned char* buff, uint8_t bufflen)
 {
