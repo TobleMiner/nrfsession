@@ -46,22 +46,22 @@ int aes_init_endecrypt(enum mode mode, const EVP_CIPHER* cipher, uint8_t blocksi
 	return 0;
 }
 
-ssize_t aes_deencrypt(enum mode mode, struct aes_ctx* ctx, unsigned char* msg, uint8_t msglen, unsigned char* buff, uint8_t bufflen)
+ssize_t aes_deencrypt(enum mode mode, struct aes_ctx* ctx, unsigned char* block, uint8_t blocklen)
 {
 	ssize_t len = 0;
-	if(bufflen < msglen || msglen % ctx->blocksize != 0)
+	if(blocklen % ctx->blocksize != 0)
 		return -EINVAL;
 	switch(mode)
 	{
 		case(DECRYPT):
-			if(EVP_DecryptUpdate(&ctx->ctx, buff, &len, msg, msglen) != 1)
+			if(EVP_DecryptUpdate(&ctx->ctx, block, &len, block, blocklen) != 1)
 			{
 				return -1;
 			}
-			EVP_DecryptFinal_ex(&ctx->ctx, buff + len, &len);
+			EVP_DecryptFinal_ex(&ctx->ctx, block + len, &len);
 			break;
 		case(ENCRYPT):
-			if(EVP_EncryptUpdate(&ctx->ctx, buff, &len, msg, msglen) != 1)
+			if(EVP_EncryptUpdate(&ctx->ctx, block, &len, block, blocklen) != 1)
 			{
 				return -1;
 			}

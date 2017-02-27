@@ -57,7 +57,7 @@ FORMAT = ihex
 TARGET = sessiontest
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c
+SRC = $(TARGET).c session/session.c util/keychain.c util/avr/hmac.c util/avr/aes.c util/list.c util/printfbackend.c util/avr/prng.c
 
 
 # List Assembler source files here.
@@ -84,7 +84,7 @@ DEBUG = dwarf-2
 
 # List any extra directories to look for include files here.
 #     Each directory must be seperated by a space.
-EXTRAINCDIRS = 
+EXTRAINCDIRS = lib/avr-crypto-lib lib/avr-crypto-lib/aes lib/avr-crypto-lib/sha1
 
 
 # Compiler flag to set the C Standard level.
@@ -117,7 +117,7 @@ CFLAGS += -Wa,-adhlns=$(<:.c=.lst)
 CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
 CFLAGS += $(CSTANDARD)
 CFLAGS += -DF_OSC=$(F_OSC)
-
+CFLAGS += -DTARGET_AVR
 
 
 # Assembler flags.
@@ -261,7 +261,21 @@ MSG_CLEANING = Cleaning project:
 
 
 # Define all object files.
-OBJ = $(SRC:.c=.o) $(ASRC:.S=.o) 
+OBJ += $(SRC:.c=.o) $(ASRC:.S=.o)
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/memxor.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/keysize_descriptor.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/aes_enc-asm.o 
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/aes_dec-asm_faster.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/aes_sbox-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/aes_invsbox-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/aes_keyschedule-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal-basic.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal_aes128.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal-cbc.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/hmac-sha1.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/entropium.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/sha256-asm.o
 
 # Define all listing files.
 LST = $(ASRC:.S=.lst) $(SRC:.c=.lst)
