@@ -15,6 +15,7 @@ int aes_init_endecrypt(enum mode mode, uint8_t blocksize, struct aes_ctx* ctx, u
 		err = -EINVAL;
 		goto exit_err;
 	}
+	ctx->blocksize = blocksize;
 	if((err = bcal_cbc_init(&aes128_desc, key, 128, &ctx->ctx)))
 	{
 		goto exit_err;
