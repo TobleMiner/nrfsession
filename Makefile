@@ -57,7 +57,7 @@ FORMAT = ihex
 TARGET = sessiontest
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c session/session.c util/keychain.c util/avr/hmac.c util/avr/aes.c util/list.c util/printfbackend.c util/avr/prng.c util/freelistcheck.c
+SRC = $(TARGET).c session/session.c util/keychain.c util/avr/hmac.c util/avr/aes.c util/list.c util/printfbackend.c util/avr/prng.c util/freelistcheck.c util/packetqueue.c
 
 
 # List Assembler source files here.
