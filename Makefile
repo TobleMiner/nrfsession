@@ -277,8 +277,8 @@ OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/hmac-sha1.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-md5/md5-asm.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-md5/hmac-md5.o
-#OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/entropium.o
-#OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/sha256-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium-md5/entropium-md5.o
+#OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium-md5/md5-asm.o
 
 # Define all listing files.
 LST = $(ASRC:.S=.lst) $(SRC:.c=.lst)

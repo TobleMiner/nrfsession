@@ -1,31 +1,25 @@
-#include <string.h>
-#include <stdlib.h>
 #include <stdint.h>
 
 #include "../prng.h"
 
+#include "../../lib/avr-crypto-lib/entropium-md5/entropium-md5.h"
+
 uint32_t prng_uint32()
 {
-	return (uint32_t)rand();
+	uint32_t rnd;
+	entropium_fillBlockRandom(&rnd, sizeof(uint32_t));
+	return rnd;		
 }
 
 uint16_t prng_uint16()
 {
-	return (uint16_t)rand();
+	uint16_t rnd;
+	entropium_fillBlockRandom(&rnd, sizeof(uint16_t));
+	return rnd;
 }
 
 void prng_bytes(unsigned char* buff, uint8_t len)
 {
-	uint8_t i;
-	uint32_t rnd;
-	for(i = 0; i + sizeof(uint32_t) <= len; i += sizeof(uint32_t))
-	{
-		rnd = prng_uint32();
-		memcpy(buff + i, &rnd, sizeof(uint32_t));
-	}
-	if(i < len)
-	{
-		rnd = prng_uint32();
-		memcpy(buff + i, &rnd, len - i);
-	}
+	entropium_fillBlockRandom(buff, len);
 }
+
