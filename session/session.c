@@ -13,18 +13,6 @@ enum id_side {
 	ID_B
 };
 
-int handler_find_session_by_id(struct session_handler* handler, struct sessionid* id, struct session* session)
-{
-	unsigned int len = llist_length(handler->sessions);
-	while(len-- > 0)
-	{
-		handler_get_session_at_index(handler, &session, len);
-		if(!memcmp(id, &session->id, sizeof(struct session)))
-			return 0;
-	}
-	return -ENOENT;
-}
-
 int handler_find_session_by_idab(enum id_side id_side, struct session_handler* handler, uint16_t id, struct session** session)
 {
 	unsigned int len = llist_length(handler->sessions);
@@ -217,7 +205,7 @@ void session_recv_packet(struct session* session, unsigned char* packet, uint8_t
 
 int session_validate_hmac(struct session* session, unsigned char* msg, uint8_t msglen, unsigned char* hmac, uint8_t hmaclen)
 {
-	int err;
+	int err = 0;
 	unsigned char* digest = malloc(hmaclen);
 	if(!digest)
 	{
@@ -288,28 +276,32 @@ int session_send_packets(struct session* session)
 		if(len > DATA_LENGTH)
 			len = DATA_LENGTH;
 		unsigned char* packet = malloc(SESSION_PACKET_DATA_LEN);
-		memset(packet, 0, SESSION_PACKET_DATA_LEN);
 		if(!packet)
 		{
 			err = -ENOMEM;
 			goto exit_err;
 		}
+		memset(packet, 0, SESSION_PACKET_DATA_LEN);
 		memcpy(packet, &session->id, sizeof(struct sessionid));
 		len = session_read_tx_data(session, packet + SESSION_PACKET_DATA_OFFSET, len);
 		memcpy(packet + SESSION_PACKET_DATA_LENGTH_OFFSET, &len, DATA_LENGTH_LENGTH);
+#ifdef VISUAL_DEBUG
 		printf("ENC: ");
 		for(int i = 0; i < DATA_LENGTH; i++)
 		{
 			printf("%c", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
 		}
 		printf("\n");
+#endif
 		aes_encrypt(&session->aes_enc, packet + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH);
+#ifdef VISUAL_DEBUG
 		printf("hex(ENC): ");
 		for(int i = 0; i < DATA_LENGTH; i++)
 		{
 			printf("%02x ", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
 		}
 		printf("\n");
+#endif
 		unsigned char* msg = malloc(HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH);
 		if(!msg)
 		{
@@ -347,20 +339,23 @@ int session_validate_and_maybe_decrypt_packet(uint8_t decrypt, struct session* s
 	err = session_validate_hmac(session, fulldata, packetlen + CHALLENGE_LENGTH, hmac, hmaclen);
 	if(decrypt)
 	{
-		aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
+#ifdef VISUAL_DEBUG
 		printf("hex(DEC): ");
 		for(int i = 0; i < DATA_LENGTH; i++)
 		{
 			printf("%02x ", (fulldata + SESSION_PACKET_DATA_OFFSET)[i]);
 		}
 		printf("\n");
+#endif
 		aes_decrypt(&session->aes_dec, packet + SESSION_PACKET_DATA_OFFSET, DATA_LENGTH);
+#ifdef VISUAL_DEBUG
 		printf("DEC: ");
 		for(int i = 0; i < DATA_LENGTH; i++)
 		{
 			printf("%c", (packet + SESSION_PACKET_DATA_OFFSET)[i]);
 		}
 		printf("\n");
+#endif
 	}
 	free(fulldata);
 exit_err:
@@ -394,7 +389,11 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			session_update_challenge_rx(session);
 			memcpy(session->iv_dec, packet + SESSION_PACKET_AUTH_IV_OFFSET, IV_LENGTH);
 			aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
+			free(session->iv_dec);
+			session->iv_dec = NULL;
 			aes_init_encrypt_128(&session->aes_enc, session->iv_enc, IV_LENGTH, session->key->key, KEY_LENGTH);
+			free(session->iv_enc);
+			session->iv_enc = NULL;
 			// No processable data in packet, check if transmitable data present immediately
 			session_send_packets(session);
 			break;
@@ -406,7 +405,11 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 				goto exit_err;
 			}
 			aes_init_decrypt_128(&session->aes_dec, session->iv_dec, IV_LENGTH, session->key->key, KEY_LENGTH);
+			free(session->iv_dec);
+			session->iv_dec = NULL;
 			aes_init_encrypt_128(&session->aes_enc, session->iv_enc, IV_LENGTH, session->key->key, KEY_LENGTH);
+			free(session->iv_enc);
+			session->iv_enc = NULL;
 			if((err = session_validate_and_decrypt_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)))
 			{
 				goto exit_err;
@@ -446,7 +449,7 @@ uint16_t handler_get_free_idab(enum id_side id_side, struct session_handler* han
 	{
 		id = prng_uint16();
 	}
-	while(!handler_find_session_by_idab(id_side, handler, id, session));
+	while(!handler_find_session_by_idab(id_side, handler, id, &session));
 	return id;
 }
 
@@ -601,7 +604,9 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 			goto exit_msg;
 		}
 		session_send_packet(session, txpacket, SESSION_PACKET_AUTH_LEN);
-		err = 0;
+		free(msg);
+		free(txpacket);
+		return 0;
 exit_msg:
 		free(msg);
 exit_packet:
