@@ -71,3 +71,8 @@ ssize_t aes_deencrypt(enum mode mode, struct aes_ctx* ctx, unsigned char* block,
 	}
 	return len;
 }
+
+void aes_free(struct aes_ctx* ctx)
+{
+	EVP_CIPHER_CTX_cleanup(&ctx->ctx);
+}

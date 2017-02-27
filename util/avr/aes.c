@@ -44,3 +44,8 @@ int aes_deencrypt(enum mode mode, struct aes_ctx* ctx, unsigned char* block, uin
 	}
 	return 0;
 }
+
+void aes_free(struct aes_ctx* ctx)
+{
+	bcal_cbc_free(&ctx->ctx);
+}

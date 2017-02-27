@@ -87,6 +87,7 @@ typedef struct session {
 	enum session_state state;
 	struct {
 		uint8_t initiator : 1;
+		uint8_t aes_init : 1;
 	} flags;
 	
 } session;

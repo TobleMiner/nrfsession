@@ -88,6 +88,11 @@ void free_session(struct session* session)
 	{
 		free(session->iv_dec);
 	}
+	if(session->flags.aes_init)
+	{
+		aes_free(&session->aes_enc);
+		aes_free(&session->aes_dec);
+	}
 	if(session->handler)
 	{
 		handler_remove_session(session->handler, session);
@@ -394,6 +399,7 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			aes_init_encrypt_128(&session->aes_enc, session->iv_enc, IV_LENGTH, session->key->key, KEY_LENGTH);
 			free(session->iv_enc);
 			session->iv_enc = NULL;
+			session->flags.aes_init = 1;
 			// No processable data in packet, check if transmitable data present immediately
 			session_send_packets(session);
 			break;
@@ -410,6 +416,7 @@ int session_process_packet(struct session* session, unsigned char* packet, uint8
 			aes_init_encrypt_128(&session->aes_enc, session->iv_enc, IV_LENGTH, session->key->key, KEY_LENGTH);
 			free(session->iv_enc);
 			session->iv_enc = NULL;
+			session->flags.aes_init = 1;
 			if((err = session_validate_and_decrypt_packet(session, packet, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)))
 			{
 				goto exit_err;
