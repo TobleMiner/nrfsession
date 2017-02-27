@@ -57,7 +57,7 @@ FORMAT = ihex
 TARGET = sessiontest
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c session/session.c util/keychain.c util/avr/hmac.c util/avr/aes.c util/list.c util/printfbackend.c util/avr/prng.c
+SRC = $(TARGET).c session/session.c util/keychain.c util/avr/hmac.c util/avr/aes.c util/list.c util/printfbackend.c util/avr/prng.c util/freelistcheck.c
 
 
 # List Assembler source files here.
@@ -272,10 +272,11 @@ OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/aes_keyschedule-asm.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal-basic.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal_aes128.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal-cbc.o
-OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1.o
+#OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1-asm.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/hmac-sha1.o
-OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/entropium.o
-OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/sha256-asm.o
+#OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/entropium.o
+#OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/sha256-asm.o
 
 # Define all listing files.
 LST = $(ASRC:.S=.lst) $(SRC:.c=.lst)
