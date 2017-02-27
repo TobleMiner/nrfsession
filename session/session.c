@@ -217,7 +217,7 @@ int session_validate_hmac(struct session* session, unsigned char* msg, uint8_t m
 		err = -ENOMEM;
 		goto exit_err;
 	}
-	if((err = hmac_sha1_err(msg, msglen, session->key->key, KEY_LENGTH, digest, hmaclen)) < 0)
+	if((err = hmac_md5_err(msg, msglen, session->key->key, KEY_LENGTH, digest, hmaclen)) < 0)
 	{
 		goto exit_digest;
 	}
@@ -315,7 +315,7 @@ int session_send_packets(struct session* session)
 		}
 		memcpy(msg, packet, SESSION_PACKET_DATA_LEN);
 		memcpy(msg + HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH, session->challenge_tx, CHALLENGE_LENGTH);
-		if((err = hmac_sha1_err(msg, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)) < 0)
+		if((err = hmac_md5_err(msg, HEADER_LENGTH + DATA_LENGTH_LENGTH + DATA_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, packet + SESSION_PACKET_AUTH_HMAC_OFFSET, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}
@@ -606,7 +606,7 @@ int handler_process_packet(struct session_handler* handler, unsigned char* packe
 		memcpy(msg, txpacket, HEADER_AND_CHALLENGE + IV_LENGTH);
 		// Copy challenge of received packet
 		memcpy(msg + SESSION_PACKET_NEW_HMAC_OFFSET, session->challenge_tx, CHALLENGE_LENGTH);
-		if((err = hmac_sha1_err(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, txpacket + SESSION_PACKET_NEW_HMAC_OFFSET, HMAC_LENGTH)) < 0)
+		if((err = hmac_md5_err(msg, HEADER_AND_CHALLENGE + IV_LENGTH + CHALLENGE_LENGTH, session->key->key, KEY_LENGTH, txpacket + SESSION_PACKET_NEW_HMAC_OFFSET, HMAC_LENGTH)) < 0)
 		{
 			goto exit_msg;
 		}

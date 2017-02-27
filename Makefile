@@ -84,7 +84,7 @@ DEBUG = dwarf-2
 
 # List any extra directories to look for include files here.
 #     Each directory must be seperated by a space.
-EXTRAINCDIRS = lib/avr-crypto-lib lib/avr-crypto-lib/aes lib/avr-crypto-lib/sha1
+EXTRAINCDIRS = lib/avr-crypto-lib lib/avr-crypto-lib/aes lib/avr-crypto-lib/sha1 lib/avr-crypto-lib/md5
 
 
 # Compiler flag to set the C Standard level.
@@ -275,6 +275,8 @@ OBJ += lib/avr-crypto-lib/bin/atmega328p/aes_faster/bcal-cbc.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1.o
 #OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/sha1-asm.o
 OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-sha1/hmac-sha1.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-md5/md5-asm.o
+OBJ += lib/avr-crypto-lib/bin/atmega328p/hmac-md5/hmac-md5.o
 #OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/entropium.o
 #OBJ += lib/avr-crypto-lib/bin/atmega328p/entropium/sha256-asm.o
 
