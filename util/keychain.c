@@ -47,6 +47,8 @@ int keychain_add_key(struct keychain* keychain, struct key* key)
 	if(*(keys + 1))
 		return -EINVAL;
 	struct key* key_ = malloc(sizeof(struct key));
+	if(!key_)
+		return -ENOMEM;
 	memcpy(key_, key, sizeof(struct key));
 	*keys = key_;
 	return 0;
